@@ -96,7 +96,7 @@ namespace Utils.CsvImporter
         {
             var fileInfo = new FileInfo(csvFilePath);
 
-            // Start with just the file name without spaces or extension
+            // Start with just the file name, replacing spaces and removing the extension
             var fileName = fileInfo.Name.Replace(" ", "_").Replace(".csv", "");
 
             if (!appSettings.IncludeDirectoryInTableName)
@@ -104,18 +104,23 @@ namespace Utils.CsvImporter
                 return fileName;
             }
 
-            // Include the directory names if specified
-            var directories = fileInfo.Directory?.FullName
-                .Replace(appSettings.CsvDirectoryPath, string.Empty)
-                .Trim(Path.DirectorySeparatorChar)
-                .Split(Path.DirectorySeparatorChar)
-                .Select(dir => dir.Replace(" ", "_"))
-                ?? [];
+            // Calculate the relative path from CsvDirectoryPath to the file's directory
+            var relativePath = Path.GetRelativePath(appSettings.CsvDirectoryPath, fileInfo?.DirectoryName ?? string.Empty);
 
-            var tableName = string.Join("_", directories.Append(fileName));
+            // Check for directories; ensure no unwanted periods ("." or "..") remain
+            if (!string.IsNullOrEmpty(relativePath) && relativePath != ".")
+            {
+                // Split relative path into directory segments
+                var dirSegments = relativePath
+                    .Split(Path.DirectorySeparatorChar)     // Split path into directory segments
+                    .Select(dir => dir.Replace(" ", "_"));  // Format each to replace spaces
 
-            // Ensure valid SQL table name length is within the acceptable limits.
-            return tableName.Length > 128 ? tableName[^128..] : tableName;
+                // Concatenate directory segments and file name with underscores
+                fileName = string.Join("_", dirSegments.Append(fileName));
+            }
+
+            // Ensure valid SQL table name length is within the acceptable limits
+            return fileName.Length > 128 ? fileName.Substring(fileName.Length - 128) : fileName;
         }
     }
 }
